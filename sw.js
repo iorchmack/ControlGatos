@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gastos-pwa-v2';
+const CACHE_NAME = 'gastos-pwa-v3';
 const urlsToCache = [
   './',
   './index.html',
