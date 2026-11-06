@@ -34,3 +34,317 @@ select.sm{width:auto}
 .cat{margin:.5rem 0}.cat div{display:flex;justify-content:space-between;font-size:.9rem}
 .bar{height:.5rem;border-radius:1rem;background:var(--line);overflow:hidden;margin-top:.25rem}.bar i{display:block;height:100%;background:var(--out)}
 .item{display:flex;justify-content:space-between;gap:.75rem;margin-bottom:.6rem}
+.item p{margin:0}.item small{color:var(--mute)}
+.item .amt{font-weight:700;text-align:right}.amt.in{color:var(--in)}.amt.out{color:var(--out)}
+.acts button{background:none;border:0;cursor:pointer;padding:.25rem;font-size:1rem}
+.empty{color:var(--mute);text-align:center;padding:1rem}
+.fab{position:fixed;right:1.25rem;bottom:calc(1.25rem + env(safe-area-inset-bottom));width:3.6rem;height:3.6rem;border-radius:50%;border:0;background:var(--acc);color:#fff;font-size:2rem;box-shadow:0 4px 14px rgba(0,0,0,.3);cursor:pointer}
+dialog{border:0;border-radius:1rem;padding:1.25rem;width:min(92vw,24rem);background:var(--card);color:var(--ink)}
+dialog::backdrop{background:rgba(0,0,0,.5)}
+label{display:block;margin:.7rem 0 .2rem;font-size:.85rem;color:var(--mute)}
+.btns{display:flex;gap:.6rem;margin-top:1.2rem}.btns .btn{flex:1}
+:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.hb{display:flex;gap:.4rem}
+.total small{display:block}.total #split{margin-top:.2rem}
+#syncState{display:block;margin-top:.8rem;opacity:.7;font-size:.8rem}
+.accs{display:flex;gap:.6rem;overflow-x:auto;margin-top:-1.4rem;padding:.2rem .1rem .6rem;scrollbar-width:none}
+.acc{flex:0 0 auto;min-width:8.5rem;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:.8rem;padding:.7rem .8rem;cursor:pointer}
+.acc small{display:block;color:var(--mute)}.acc b{font-size:1.1rem}.acc b.neg{color:var(--out)}
+.acc.add{display:flex;align-items:center;color:var(--acc);font-weight:600;background:transparent;border-style:dashed}
+.stats{margin-top:.9rem}
+.amt.tr{color:var(--acc)}
+.hint{font-size:.8rem;color:var(--mute);margin:.5rem 0 0}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <div class="top"><h1>Mis Finanzas</h1><div class="hb"><button class="btn ghost" id="btnSync" aria-label="Configurar sincronización">☁️</button><button class="btn ghost" id="btnExport">Excel</button></div></div>
+  <div class="total"><small>Disponible real</small><strong id="balance"></strong><small id="split"></small></div>
+  <small id="syncState"></small>
+</header>
+
+<div class="pad">
+  <div class="accs" id="accs"></div>
+  <div class="stats">
+    <div class="stat in"><small>Ingresos</small><b id="income"></b></div>
+    <div class="stat out"><small>Gastos</small><b id="expense"></b></div>
+  </div>
+  <div class="row"><h3>Periodo</h3><select id="period" class="sm" aria-label="Periodo"></select></div>
+  <h3>Gastos por categoría</h3>
+  <div class="card" id="cats"></div>
+  <div class="row"><h3>Movimientos</h3></div>
+  <div id="list"></div>
+  <p class="hint" style="text-align:center;margin-top:1.5rem">Versión 4 · cuentas y sincronización</p>
+</div>
+
+<button class="fab" id="btnAdd" aria-label="Agregar movimiento">+</button>
+
+<dialog id="dlgTx">
+  <h3 id="dlgTitle">Nuevo movimiento</h3>
+  <form id="form">
+    <input type="hidden" id="id">
+    <label for="type">Tipo</label>
+    <select id="type"><option value="expense">Gasto</option><option value="income">Ingreso</option><option value="transfer">Transferencia entre cuentas</option></select>
+    <label for="account" id="lblAcc">Cuenta</label><select id="account"></select>
+    <div id="rowTo"><label for="to">Cuenta destino</label><select id="to"></select></div>
+    <label for="amount">Monto</label>
+    <input id="amount" type="number" inputmode="decimal" step="0.01" min="0.01" required>
+    <label for="desc">Descripción</label>
+    <input id="desc" type="text" maxlength="80">
+    <div id="rowCat"><label for="cat">Categoría</label>
+    <input id="cat" type="text" list="catList" maxlength="30" placeholder="Comida, Transporte, Salario"></div>
+    <datalist id="catList"></datalist>
+    <label for="date">Fecha</label>
+    <input id="date" type="date" required>
+    <div class="btns"><button type="button" class="btn alt" data-close>Cancelar</button><button class="btn">Guardar</button></div>
+  </form>
+</dialog>
+
+<dialog id="dlgAcc">
+  <h3 id="accTitle">Nueva cuenta</h3>
+  <form id="accForm">
+    <input type="hidden" id="accId">
+    <label for="accName">Nombre</label><input id="accName" maxlength="30" placeholder="BBVA, Cartera, Santander" required>
+    <label for="accKind">Tipo</label>
+    <select id="accKind"><option value="cash">Efectivo</option><option value="bank">Cuenta bancaria</option><option value="credit">Tarjeta de crédito</option></select>
+    <label for="accInit">Saldo inicial</label><input id="accInit" type="number" inputmode="decimal" step="0.01" value="0">
+    <p class="hint">En tarjetas de crédito, los gastos restan: un saldo negativo es lo que debes.</p>
+    <div class="btns"><button type="button" class="btn alt" data-close>Cancelar</button><button type="button" class="btn alt" id="accDel">Eliminar</button><button class="btn">Guardar</button></div>
+  </form>
+</dialog>
+
+<dialog id="dlgExp">
+  <h3>Exportar a Excel</h3>
+  <label for="from">Desde</label><input id="from" type="date">
+  <label for="to2">Hasta</label><input id="to2" type="date">
+  <div class="btns"><button type="button" class="btn alt" data-close>Cancelar</button><button type="button" class="btn ok" id="btnDoExport">Descargar</button></div>
+</dialog>
+
+<dialog id="dlgGH">
+  <h3>Sincronizar con GitHub</h3>
+  <label for="ghRepo">Repositorio (usuario/repo)</label><input id="ghRepo" placeholder="osiris/mis-finanzas-datos" autocapitalize="off">
+  <label for="ghBranch">Rama</label><input id="ghBranch" value="main" autocapitalize="off">
+  <label for="ghToken">Token de acceso</label><input id="ghToken" type="password" autocomplete="off" autocapitalize="off">
+  <p class="hint">Usa un repositorio <b>privado</b> distinto al de GitHub Pages (Pages es público) y un token fine-grained con permiso Contents: Read and write solo para ese repo. El token se guarda únicamente en este dispositivo; repite esto en cada uno.</p>
+  <div class="btns"><button type="button" class="btn alt" data-close>Cancelar</button><button type="button" class="btn alt" id="ghOff">Desconectar</button><button type="button" class="btn" id="ghSave">Conectar</button></div>
+</dialog>
+</main>
+
+<script>
+const KEY = 'finanzas_v2', CFG = 'finanzas_gh', FILE = 'data.json';
+const $ = id => document.getElementById(id);
+const money = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' });
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const today = () => { const d = new Date(); return new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10); };
+const uid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const ICON = { cash: '💵', bank: '🏦', credit: '💳' };
+
+// ---- Datos: cada registro lleva u (última edición) y d (borrado) para poder combinar dispositivos ----
+let db = load(), period = today().slice(0, 7);
+
+function load() {
+  try { const v = JSON.parse(localStorage.getItem(KEY)); if (v && v.accounts) return v; } catch {}
+  let old = []; try { old = JSON.parse(localStorage.getItem('finanzas_data')) || []; } catch {}
+  return { // cuentas por defecto con u:0 para que cualquier edición real las supere
+    accounts: [{ id: 'a_cash', name: 'Efectivo', kind: 'cash', initial: 0, u: 0 }, { id: 'a_bank', name: 'Banco', kind: 'bank', initial: 0, u: 0 }],
+    tx: old.map(x => ({ id: 't' + x.id, type: x.type, amount: x.amount, desc: x.desc, category: x.category, date: x.date, account: 'a_cash', u: 0 }))
+  };
+}
+const saveLocal = () => { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch { alert('No se pudo guardar en el dispositivo.'); } };
+const accs = () => db.accounts.filter(a => !a.d), txs = () => db.tx.filter(t => !t.d);
+
+function balances() {
+  const b = {}; accs().forEach(a => b[a.id] = Number(a.initial) || 0);
+  txs().forEach(t => {
+    if (t.type === 'transfer') { if (t.account in b) b[t.account] -= t.amount; if (t.to in b) b[t.to] += t.amount; }
+    else if (t.account in b) b[t.account] += t.type === 'income' ? t.amount : -t.amount;
+  });
+  return b;
+}
+
+function render() {
+  const A = accs(), B = balances(), T = txs(), name = Object.fromEntries(db.accounts.map(a => [a.id, a.name]));
+  const total = Object.values(B).reduce((s, v) => s + v, 0);
+  const liq = A.filter(a => a.kind !== 'credit').reduce((s, a) => s + B[a.id], 0);
+  const debt = A.filter(a => a.kind === 'credit').reduce((s, a) => s + B[a.id], 0);
+  $('balance').textContent = money.format(total);
+  $('split').textContent = A.some(a => a.kind === 'credit') ? `Efectivo y bancos ${money.format(liq)} · Tarjetas ${money.format(debt)}` : `Suma de ${A.length} cuentas`;
+  $('accs').innerHTML = A.map(a => `<button class="acc" data-acc="${esc(a.id)}"><small>${ICON[a.kind] || ''} ${esc(a.name)}</small><b class="${B[a.id] < 0 ? 'neg' : ''}">${money.format(B[a.id])}</b></button>`).join('') + '<button class="acc add" data-acc="">+ Cuenta</button>';
+
+  const months = [...new Set([today().slice(0, 7), ...T.map(t => t.date.slice(0, 7))])].sort().reverse();
+  if (period !== 'all' && !months.includes(period)) period = months[0];
+  $('period').innerHTML = months.map(m => `<option value="${m}">${new Date(m + '-15').toLocaleDateString('es-MX', { month: 'long', year: 'numeric' })}</option>`).join('') + '<option value="all">Todo</option>';
+  $('period').value = period;
+
+  const rows = period === 'all' ? T : T.filter(t => t.date.startsWith(period));
+  const inc = rows.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+  const exp = rows.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+  $('income').textContent = money.format(inc); $('expense').textContent = money.format(exp);
+
+  const byCat = {};
+  rows.filter(t => t.type === 'expense').forEach(t => byCat[t.category] = (byCat[t.category] || 0) + t.amount);
+  const ent = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
+  $('cats').innerHTML = ent.length ? ent.map(([c, v]) => `<div class="cat"><div><span>${esc(c)}</span><b>${money.format(v)}</b></div><div class="bar"><i style="width:${(v / exp * 100).toFixed(1)}%"></i></div></div>`).join('') : '<p class="empty">Sin gastos en este periodo.</p>';
+
+  const sorted = [...rows].sort((a, b) => b.date.localeCompare(a.date) || b.u - a.u);
+  $('list').innerHTML = sorted.length ? sorted.map(t => {
+    const tr = t.type === 'transfer', sign = t.type === 'income' ? '+' : tr ? '' : '-';
+    const sub = tr ? `${esc(name[t.account] || '?')} → ${esc(name[t.to] || '?')}` : `${esc(t.category)} · ${esc(name[t.account] || '?')}`;
+    return `<div class="card item"><div><p>${esc(t.desc || (tr ? 'Transferencia' : ''))}</p><small>${esc(t.date)} · ${sub}</small></div>
+      <div class="amt ${tr ? 'tr' : t.type === 'income' ? 'in' : 'out'}">${sign}${money.format(t.amount)}
+      <div class="acts"><button data-edit="${esc(t.id)}" aria-label="Editar">✏️</button><button data-del="${esc(t.id)}" aria-label="Eliminar">🗑️</button></div></div></div>`;
+  }).join('') : '<p class="empty">No hay movimientos. Toca + para agregar el primero.</p>';
+  $('catList').innerHTML = [...new Set(T.map(t => t.category).filter(Boolean))].map(c => `<option value="${esc(c)}">`).join('');
+}
+const commit = () => { saveLocal(); render(); schedule(); };
+
+// ---- Movimientos ----
+const accOptions = () => accs().map(a => `<option value="${esc(a.id)}">${esc(a.name)}</option>`).join('');
+function typeUI() {
+  const tr = $('type').value === 'transfer';
+  $('rowTo').hidden = !tr; $('rowCat').hidden = tr; $('lblAcc').textContent = tr ? 'Cuenta origen' : 'Cuenta';
+  $('cat').required = !tr; $('desc').required = !tr; $('to').required = tr;
+}
+function openTx(t) {
+  if (!accs().length) return alert('Primero crea una cuenta.');
+  $('form').reset();
+  $('account').innerHTML = $('to').innerHTML = accOptions();
+  $('dlgTitle').textContent = t ? 'Editar movimiento' : 'Nuevo movimiento';
+  $('id').value = t ? t.id : '';
+  $('type').value = t ? t.type : 'expense';
+  if (t) { $('account').value = t.account; if (t.to) $('to').value = t.to; }
+  else if (accs().length > 1) $('to').selectedIndex = 1;
+  $('amount').value = t ? t.amount : ''; $('desc').value = t ? t.desc || '' : ''; $('cat').value = t ? t.category || '' : '';
+  $('date').value = t ? t.date : today();
+  typeUI(); $('dlgTx').showModal();
+}
+$('type').addEventListener('change', typeUI);
+$('form').addEventListener('submit', e => {
+  e.preventDefault();
+  const type = $('type').value, amount = parseFloat($('amount').value);
+  if (!(amount > 0)) return;
+  if (type === 'transfer' && $('account').value === $('to').value) return alert('Elige cuentas distintas.');
+  const t = { id: $('id').value || uid('t'), type, amount, desc: $('desc').value.trim(), date: $('date').value, account: $('account').value, u: Date.now() };
+  if (type === 'transfer') t.to = $('to').value; else t.category = $('cat').value.trim();
+  const i = db.tx.findIndex(x => x.id === t.id);
+  i > -1 ? db.tx[i] = t : db.tx.push(t);
+  $('dlgTx').close(); commit();
+});
+$('list').addEventListener('click', e => {
+  const ed = e.target.closest('[data-edit]'), del = e.target.closest('[data-del]');
+  if (ed) openTx(db.tx.find(t => t.id === ed.dataset.edit));
+  if (del && confirm('¿Eliminar este movimiento?')) { const t = db.tx.find(x => x.id === del.dataset.del); t.d = true; t.u = Date.now(); commit(); }
+});
+
+// ---- Cuentas ----
+function openAcc(id) {
+  const a = db.accounts.find(x => x.id === id);
+  $('accForm').reset();
+  $('accTitle').textContent = a ? 'Editar cuenta' : 'Nueva cuenta';
+  $('accId').value = a ? a.id : ''; $('accName').value = a ? a.name : '';
+  $('accKind').value = a ? a.kind : 'bank'; $('accInit').value = a ? a.initial : 0;
+  $('accDel').hidden = !a; $('dlgAcc').showModal();
+}
+$('accs').addEventListener('click', e => { const b = e.target.closest('[data-acc]'); if (b) openAcc(b.dataset.acc); });
+$('accForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const a = { id: $('accId').value || uid('a_'), name: $('accName').value.trim(), kind: $('accKind').value, initial: parseFloat($('accInit').value) || 0, u: Date.now() };
+  const i = db.accounts.findIndex(x => x.id === a.id);
+  i > -1 ? db.accounts[i] = a : db.accounts.push(a);
+  $('dlgAcc').close(); commit();
+});
+$('accDel').addEventListener('click', () => {
+  const id = $('accId').value;
+  if (txs().some(t => t.account === id || t.to === id)) return alert('Esta cuenta tiene movimientos. Elimínalos o muévelos antes de borrarla.');
+  if (!confirm('¿Eliminar esta cuenta?')) return;
+  const a = db.accounts.find(x => x.id === id); a.d = true; a.u = Date.now();
+  $('dlgAcc').close(); commit();
+});
+
+// ---- Sincronización con GitHub (combina por registro, gana la edición más reciente) ----
+const cfg = () => { try { return JSON.parse(localStorage.getItem(CFG)); } catch { return null; } };
+const b64e = s => btoa(unescape(encodeURIComponent(s))), b64d = s => decodeURIComponent(escape(atob(s)));
+const setState = s => $('syncState').textContent = s;
+let syncing = false, again = false, timer;
+
+const api = (c, method, body) => fetch(`https://api.github.com/repos/${c.repo}/contents/${FILE}` + (method === 'GET' ? `?ref=${encodeURIComponent(c.branch)}` : ''), {
+  method, cache: 'no-store', body: body && JSON.stringify(body),
+  headers: { Authorization: 'Bearer ' + c.token, Accept: 'application/vnd.github+json' }
+});
+function mergeList(local, remote) {
+  const m = new Map((remote || []).map(x => [x.id, x])); let up = false;
+  local.forEach(x => { const y = m.get(x.id); if (!y || x.u > y.u) { m.set(x.id, x); up = true; } });
+  return { list: [...m.values()].sort((p, q) => String(p.id) < String(q.id) ? -1 : 1), up };
+}
+function schedule() { clearTimeout(timer); if (cfg()) { setState('Cambios pendientes…'); timer = setTimeout(sync, 1500); } }
+async function sync() {
+  const c = cfg();
+  if (!c) return setState('Solo en este dispositivo');
+  if (!navigator.onLine) return setState('Sin conexión: se sincronizará después');
+  if (syncing) { again = true; return; }
+  syncing = true; setState('Sincronizando…');
+  try {
+    for (let i = 0; i < 3; i++) {
+      const r = await api(c, 'GET'); let remote = null, sha;
+      if (r.ok) { const j = await r.json(); sha = j.sha; remote = JSON.parse(b64d(j.content)); }
+      else if (r.status !== 404) throw new Error(r.status === 401 || r.status === 403 ? 'Token sin permiso' : 'Error ' + r.status);
+      const a = mergeList(db.accounts, remote && remote.accounts), t = mergeList(db.tx, remote && remote.tx);
+      db = { accounts: a.list, tx: t.list }; saveLocal();
+      if (remote && !a.up && !t.up) break;
+      const p = await api(c, 'PUT', { message: 'sync ' + new Date().toISOString(), content: b64e(JSON.stringify(db, null, 1)), sha, branch: c.branch });
+      if (p.status === 409 || p.status === 422) continue;
+      if (!p.ok) throw new Error('Error al guardar ' + p.status);
+      break;
+    }
+    setState('☁️ Sincronizado ' + new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }));
+  } catch (e) { setState('⚠️ ' + (e.message || 'No se pudo sincronizar')); }
+  syncing = false; render();
+  if (again) { again = false; sync(); }
+}
+$('btnSync').addEventListener('click', () => {
+  const c = cfg() || {};
+  $('ghRepo').value = c.repo || ''; $('ghBranch').value = c.branch || 'main'; $('ghToken').value = c.token || '';
+  $('dlgGH').showModal();
+});
+$('ghSave').addEventListener('click', () => {
+  const repo = $('ghRepo').value.trim(), token = $('ghToken').value.trim();
+  if (!/^[\w.-]+\/[\w.-]+$/.test(repo) || !token) return alert('Escribe el repositorio como usuario/repo y el token.');
+  localStorage.setItem(CFG, JSON.stringify({ repo, token, branch: $('ghBranch').value.trim() || 'main' }));
+  $('dlgGH').close(); sync();
+});
+$('ghOff').addEventListener('click', () => { localStorage.removeItem(CFG); $('dlgGH').close(); setState('Solo en este dispositivo'); });
+addEventListener('online', sync);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) sync(); });
+
+// ---- Excel ----
+const loadXLSX = () => window.XLSX ? Promise.resolve() : new Promise((ok, fail) => {
+  const s = document.createElement('script');
+  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; s.onload = ok; s.onerror = fail; document.head.appendChild(s);
+});
+$('btnExport').addEventListener('click', () => $('dlgExp').showModal());
+$('btnDoExport').addEventListener('click', async () => {
+  const from = $('from').value, to = $('to2').value, name = Object.fromEntries(db.accounts.map(a => [a.id, a.name]));
+  const rows = txs().filter(t => (!from || t.date >= from) && (!to || t.date <= to)).sort((a, b) => a.date.localeCompare(b.date));
+  if (!rows.length) return alert('No hay datos en ese rango de fechas.');
+  try { await loadXLSX(); } catch { return alert('Para exportar la primera vez necesitas conexión a internet.'); }
+  const label = { income: 'Ingreso', expense: 'Gasto', transfer: 'Transferencia' };
+  const ws = XLSX.utils.json_to_sheet(rows.map(t => ({ Fecha: t.date, Tipo: label[t.type], Cuenta: name[t.account] || '', Destino: t.to ? name[t.to] || '' : '', Categoría: t.category || '', Descripción: t.desc || '', Monto: t.amount })));
+  ws['!cols'] = [{ wch: 12 }, { wch: 14 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 30 }, { wch: 12 }];
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Movimientos');
+  XLSX.writeFile(wb, `Reporte_${from || 'inicio'}_a_${to || 'hoy'}.xlsx`); $('dlgExp').close();
+});
+
+$('period').addEventListener('change', e => { period = e.target.value; render(); });
+$('btnAdd').addEventListener('click', () => openTx());
+document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => b.closest('dialog').close()));
+
+saveLocal(); render(); setState(cfg() ? 'Sincronizando…' : 'Solo en este dispositivo'); sync();
+if ('serviceWorker' in navigator) {
+  const had = !!navigator.serviceWorker.controller; let done;
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (had && !done) { done = true; location.reload(); } });
+  addEventListener('load', () => navigator.serviceWorker.register('./sw.js').then(r => r.update()).catch(console.error));
+}
+</script>
+</body>
+</html>
